@@ -1,21 +1,71 @@
 import sqlite3
-import json
 from app.models.product import Product
 
-def get_db_connection():
+def search_products_in_db(suggestion):
     conn = sqlite3.connect('walmart_products.db')
     conn.row_factory = sqlite3.Row
-    return conn
+    cursor = conn.cursor()
 
-def search_products(suggestions):
-    conn = get_db_connection()
-    c = conn.cursor()
+    # Generalize the query for product types and categories
+    product_type_query = " OR ".join([
+        "product_name LIKE ?",
+        "product_name LIKE ?"
+    ])
+    
+    category_query = " OR ".join([
+        "category_name LIKE ?",
+        "category_name LIKE ?"
+    ])
 
-    query, params = build_search_query(suggestions)
+    # Prepare the keywords query
+    keywords_query = " OR ".join([
+        "product_name LIKE ?",
+        "description LIKE ?"
+    ])
 
-    c.execute(query, params)
-    results = c.fetchall()
+    # Construct the SQL query
+    query = f"""
+    SELECT * FROM products
+    WHERE ({product_type_query}) AND ({category_query})
+    """
+    
+    # Initialize query parameters
+    params = [
+        f"%{suggestion['product_type']}%",
+        f"%{suggestion['product_type']}%",  # For synonyms or variations
+        f"%{suggestion['category']}%",
+        f"%{suggestion['category']}%"  # For broader category matches
+    ]
 
+    # Append keywords to query and parameters
+    if suggestion.get('keywords'):
+        query += f" AND ({keywords_query})"
+        for keyword in suggestion['keywords']:
+            params.extend([f"%{keyword}%", f"%{keyword}%"])
+
+    # Optionally add additional filters based on provided suggestion
+    if suggestion.get('brand'):
+        query += " AND brand LIKE ?"
+        params.append(f"%{suggestion['brand']}%")
+
+    if suggestion.get('price_range'):
+        query += " AND final_price BETWEEN ? AND ?"
+        params.extend([suggestion['price_range']['min'], suggestion['price_range']['max']])
+
+    if suggestion.get('color'):
+        query += " AND colors LIKE ?"
+        params.append(f"%{suggestion['color']}%")
+
+    if suggestion.get('min_rating'):
+        query += " AND rating >= ?"
+        params.append(float(suggestion['min_rating']))
+
+    query += " ORDER BY rating DESC, review_count DESC LIMIT 10"
+
+    cursor.execute(query, params)
+    results = cursor.fetchall()
+
+    # Map results to Product instances and convert to dictionaries
     products = [Product(
         id=row['id'],
         product_name=row['product_name'],
@@ -23,56 +73,10 @@ def search_products(suggestions):
         final_price=row['final_price'],
         brand=row['brand'],
         rating=row['rating'],
-        review_count=row['review_count']
+        review_count=row['review_count'],
+        image_url=row['main_image'],
+        description=row['description']
     ).to_dict() for row in results]
 
     conn.close()
     return products
-
-def build_search_query(suggestions):
-    query = "SELECT * FROM products WHERE 1=1"
-    params = []
-
-    if suggestions['products']:
-        categories = list(set(product['category'] for product in suggestions['products']))
-        query += " AND (category_name IN ({}) OR root_category_name IN ({}))".format(
-            ','.join('?' * len(categories)),
-            ','.join('?' * len(categories))
-        )
-        params.extend(categories * 2)
-
-    if suggestions['price_range']:
-        query += " AND final_price BETWEEN ? AND ?"
-        params.extend([suggestions['price_range']['min'], suggestions['price_range']['max']])
-
-    if suggestions['brand']:
-        query += " AND brand LIKE ?"
-        params.append(f"%{suggestions['brand']}%")
-
-    if suggestions['color']:
-        query += " AND colors LIKE ?"
-        params.append(f"%{suggestions['color']}%")
-
-    if suggestions['min_rating']:
-        query += " AND rating >= ?"
-        params.append(suggestions['min_rating'])
-
-    if suggestions['aisle']:
-        query += " AND aisle LIKE ?"
-        params.append(f"%{suggestions['aisle']}%")
-
-    if suggestions['free_returns'] is not None:
-        query += " AND free_returns = ?"
-        params.append(1 if suggestions['free_returns'] else 0)
-
-    # Add conditions for keywords
-    if suggestions['keywords']:
-        keyword_conditions = []
-        for keyword in suggestions['keywords']:
-            keyword_conditions.append("(product_name LIKE ? OR description LIKE ?)")
-            params.extend([f"%{keyword}%", f"%{keyword}%"])
-        query += " AND (" + " OR ".join(keyword_conditions) + ")"
-
-    query += " ORDER BY rating DESC, review_count DESC LIMIT 20"
-
-    return query, params
