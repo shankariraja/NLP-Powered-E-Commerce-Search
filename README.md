@@ -11,7 +11,9 @@ This project implements an AI-powered search system for e-commerce platform usin
 4. Install dependencies: `pip install -r requirements.txt`
 5. Set up the database: `python scripts/init_db.py`
 6. Set your Gemini API key as an environment variable: `export GEMINI_API_KEY=your_api_key_here`
-7. python `app/scripts/init_db.py`
+7. Set up the database:
+   - Set the PYTHONPATH and run the initialization script: `export PYTHONPATH=$PYTHONPATH:/home/ubuntu/git/SearchAI`
+   - Run: `python -m app.scripts.init_db`
 7. Run the application: `python run.py`
 
 ## Usage
