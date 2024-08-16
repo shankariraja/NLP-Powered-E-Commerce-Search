@@ -5,7 +5,7 @@ from ..config.config import GEMINI_API_KEY, GEMINI_API_URL
 import google.generativeai as genai
 
 # Configure the Gemini API
-genai.configure(api_key='AIzaSyD-LRxvIZOgmArqcJwXE3rpixFk5-LoHJE')
+genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel("gemini-1.5-flash")
 
 def get_gemini_suggestions(query):
