@@ -2,48 +2,37 @@ import sqlite3
 from app.models.product import Product
 
 def search_products_in_db(suggestion):
-    conn = sqlite3.connect('walmart_products.db')
+    # Debugging statement to verify the formed suggestion
+    print(f"Debug: Suggestion criteria - {suggestion}")
+
+    try:
+        conn = sqlite3.connect('walmart_products.db')
+        print("Debug: Successfully connected to the Walmart database.")
+    except sqlite3.Error as e:
+        print(f"Debug: Error connecting to the Walmart database - {e}")
+        return []
+
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
-    # Generalize the query for product types and categories
-    product_type_query = " OR ".join([
-        "product_name LIKE ?",
-        "product_name LIKE ?"
-    ])
-    
-    category_query = " OR ".join([
-        "category_name LIKE ?",
-        "category_name LIKE ?"
-    ])
+    query = "SELECT * FROM products WHERE 1=1"
+    params = []
 
-    # Prepare the keywords query
-    keywords_query = " OR ".join([
-        "product_name LIKE ?",
-        "description LIKE ?"
-    ])
+    # Add filters based on suggestion
+    if suggestion.get('product_type'):
+        query += " AND (product_name LIKE ? OR category_name LIKE ?)"
+        params.extend([f"%{suggestion['product_type']}%", f"%{suggestion['product_type']}%"])
 
-    # Construct the SQL query
-    query = f"""
-    SELECT * FROM products
-    WHERE ({product_type_query}) AND ({category_query})
-    """
-    
-    # Initialize query parameters
-    params = [
-        f"%{suggestion['product_type']}%",
-        f"%{suggestion['product_type']}%",  # For synonyms or variations
-        f"%{suggestion['category']}%",
-        f"%{suggestion['category']}%"  # For broader category matches
-    ]
+    if suggestion.get('category'):
+        query += " AND category_name LIKE ?"
+        params.append(f"%{suggestion['category']}%")
 
-    # Append keywords to query and parameters
     if suggestion.get('keywords'):
-        query += f" AND ({keywords_query})"
+        keyword_conditions = " OR ".join(["product_name LIKE ? OR description LIKE ?"] * len(suggestion['keywords']))
+        query += f" AND ({keyword_conditions})"
         for keyword in suggestion['keywords']:
             params.extend([f"%{keyword}%", f"%{keyword}%"])
 
-    # Optionally add additional filters based on provided suggestion
     if suggestion.get('brand'):
         query += " AND brand LIKE ?"
         params.append(f"%{suggestion['brand']}%")
@@ -62,10 +51,13 @@ def search_products_in_db(suggestion):
 
     query += " ORDER BY rating DESC, review_count DESC LIMIT 10"
 
+    # Debugging statement to verify the formed SQL query
+    print(f"Debug: SQL Query - {query}")
+    print(f"Debug: SQL Parameters - {params}")
+
     cursor.execute(query, params)
     results = cursor.fetchall()
 
-    # Map results to Product instances and convert to dictionaries
     products = [Product(
         id=row['id'],
         product_name=row['product_name'],

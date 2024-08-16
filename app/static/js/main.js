@@ -13,9 +13,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function performSearch() {
         const query = searchInput.value;
-        if (query.trim() === '') return;
+        console.log(`Debug: User query - ${query}`);
+
+        if (query.trim() === '') {
+            console.log('Debug: Empty query, search aborted.');
+            return;
+        }
 
         resultsContainer.innerHTML = 'Searching...';
+        console.log('Debug: Initiated search with query:', query);
 
         fetch('/search', {
             method: 'POST',
@@ -25,12 +31,14 @@ document.addEventListener('DOMContentLoaded', function() {
             body: JSON.stringify({ query: query }),
         })
         .then(response => {
+            console.log('Debug: Received response status:', response.status);
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
             return response.json();
         })
         .then(data => {
+            console.log('Debug: Received data:', data);
             displayResults(data);
         })
         .catch(error => {
@@ -40,9 +48,12 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function displayResults(data) {
+        console.log('Debug: Displaying results:', data);
+
         resultsContainer.innerHTML = '';
 
         if (!Array.isArray(data) || data.length === 0) {
+            console.log('Debug: No results found.');
             resultsContainer.innerHTML = 'No results found.';
             return;
         }
@@ -51,6 +62,8 @@ document.addEventListener('DOMContentLoaded', function() {
         productsList.innerHTML = '<h2>Matching Products</h2>';
         
         data.forEach(product => {
+            console.log('Debug: Processing product:', product);
+
             const productElement = document.createElement('div');
             productElement.className = 'product';
             productElement.innerHTML = `
@@ -64,6 +77,8 @@ document.addEventListener('DOMContentLoaded', function() {
             `;
             productsList.appendChild(productElement);
         });
+
         resultsContainer.appendChild(productsList);
+        console.log('Debug: Results displayed successfully.');
     }
 });
